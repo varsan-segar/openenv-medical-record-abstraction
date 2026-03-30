@@ -141,28 +141,34 @@ docker run -p 8000:8000 medical_record_abstraction_env
 
 ## 📁 Project Structure
 
-```
+```text
 medical_record_abstraction_env/
 ├── openenv.yaml                    # OpenEnv manifest
 ├── pyproject.toml                  # Package config
+├── uv.lock                         # Strict dependency map
+├── .env.example                    # Secure API Key template
+├── .gitignore                      # Repository safety blockers
+├── .dockerignore                   # Docker build filters
 ├── inference.py                    # Baseline inference script
 ├── models.py                       # Action, Observation, State models
 ├── client.py                       # EnvClient subclass
 ├── __init__.py                     # Package exports
+├── README.md                       # Full documentation
 ├── data/
 │   ├── synthetic_notes.py          # 24 clinical notes with ground truth
 │   ├── medical_ontology.py         # 47 conditions, ICD-10, synonyms
-│   └── drug_interactions.py        # 30 drug interactions
+│   └── drug_interactions.py        # 30 planted drug interactions
 ├── server/
-│   ├── app.py                      # FastAPI application
-│   ├── environment.py                    # Environment implementation
-│   ├── graders.py                  # Deterministic grading system
-│   ├── reward.py                   # Reward shaping
-│   ├── tasks.py                    # Task configs + guidelines
-│   └── Dockerfile                  # Container deployment
+│   ├── app.py                      # FastAPI application via create_app()
+│   ├── environment.py              # Environment (step/reset/state)
+│   ├── graders.py                  # Deterministic grading system (F1, ROUGE-L)
+│   ├── reward.py                   # Continuous reward shaping
+│   ├── tasks.py                    # Task configs + clinical guidelines
+│   ├── Dockerfile                  # Container deployment config
+│   └── requirements.txt            # Local snapshot dependencies
 ├── tests/
-│   ├── test_env.py                 # Environment tests
-│   └── test_graders.py             # Grader tests
+│   ├── test_env.py                 # Environment tests (24 items)
+│   └── test_graders.py             # Grader tests (29 items)
 └── examples/
     ├── sample_note.txt             # Example clinical note
     └── expected_output.json        # Expected extraction outputs
