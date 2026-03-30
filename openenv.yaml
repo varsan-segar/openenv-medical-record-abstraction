@@ -1,0 +1,23 @@
+spec_version: 1
+name: medical_record_abstraction_env
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000
+
+description: >
+  Medical Record Abstraction environment. Agents extract clinical
+  information from synthetic patient notes across 3 difficulty levels
+  (demographics, entity extraction + drug conflict detection, risk assessment).
+  Deterministic graders produce scores in [0.0, 1.0].
+
+tasks:
+  - id: task_1
+    name: Basic Clinical Extraction
+    difficulty: easy
+  - id: task_2
+    name: Clinical Entity Extraction + Validation
+    difficulty: medium
+  - id: task_3
+    name: Risk Assessment + Clinical Reasoning
+    difficulty: hard

@@ -1,0 +1,17 @@
+# Same as .gitignore - don't copy secrets into the docker image!
+.env
+.venv
+env/
+venv/
+
+# Ignore cache
+__pycache__/
+*.pyc
+
+# Ignore temp files
+.git/
+.gitignore
+.vscode/
+
+# Ignore outputs
+inference_results.json

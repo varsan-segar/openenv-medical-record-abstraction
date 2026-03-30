@@ -1,0 +1,16 @@
+PATIENT: Maria Rodriguez, 52 y/o Female
+DATE: 2024-03-15
+CHIEF COMPLAINT: Persistent headache for 3 days
+
+HISTORY OF PRESENT ILLNESS:
+Ms. Rodriguez presents with a 3-day history of bilateral frontal headaches,
+described as a constant pressure sensation rated 6/10. Pain is worse in the
+morning and improves slightly with ibuprofen. She denies visual changes,
+nausea, or vomiting. No recent head trauma. She has a history of untreated
+hypertension.
+
+VITAL SIGNS:
+BP: 158/94 mmHg | HR: 78 bpm | Temp: 98.6°F | RR: 16 | SpO2: 98%
+
+ASSESSMENT: Hypertensive urgency, tension-type headache
+PLAN: Amlodipine 5mg daily, follow-up in 1 week, headache diary recommended

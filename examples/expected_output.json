@@ -1,0 +1,44 @@
+{
+  "task_1_output": {
+    "patient_name": "Maria Rodriguez",
+    "age": 52,
+    "sex": "Female",
+    "chief_complaint": "Persistent headache for 3 days",
+    "onset_date": "2024-03-12",
+    "vital_signs": {
+      "blood_pressure": "158/94",
+      "heart_rate": 78,
+      "temperature": 98.6,
+      "respiratory_rate": 16,
+      "spo2": 98
+    }
+  },
+  "task_2_output": {
+    "diagnoses": [
+      {"condition": "hypertension", "icd_code": "I10"},
+      {"condition": "tension_headache", "icd_code": "G44.209"}
+    ],
+    "medications": [
+      {"drug": "amlodipine", "dosage": "5mg daily", "indication": "hypertension"},
+      {"drug": "ibuprofen", "dosage": "PRN", "indication": "headache"}
+    ],
+    "allergies_mentioned": [],
+    "inconsistencies": []
+  },
+  "task_3_output": {
+    "risk_level": "medium",
+    "risk_factors": [
+      "untreated hypertension",
+      "elevated blood pressure 158/94"
+    ],
+    "critical_flags": [
+      {
+        "flag": "Hypertensive urgency BP 158/94",
+        "action": "Initiate antihypertensive therapy, monitor BP closely",
+        "urgency": "urgent"
+      }
+    ],
+    "readmission_risk_score": 0.25,
+    "clinical_summary": "52-year-old female with untreated hypertension presenting with tension-type headaches. Blood pressure is significantly elevated at 158/94. Started on amlodipine with close follow-up planned."
+  }
+}
