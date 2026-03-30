@@ -247,8 +247,10 @@ def main():
     total_n = sum(len(s) for s in task_scores.values())
     print(f"\n  Overall average: {overall / total_n:.4f}" if total_n else "")
 
-    # Save results
-    results_path = os.path.join(os.path.dirname(__file__), "inference_results.json")
+    # Save results into the standard openenv outputs directory
+    outputs_dir = os.path.join(os.path.dirname(__file__), "outputs")
+    os.makedirs(outputs_dir, exist_ok=True)
+    results_path = os.path.join(outputs_dir, "inference_results.json")
     with open(results_path, "w") as f:
         json.dump({
             "config": {
