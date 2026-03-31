@@ -36,6 +36,5 @@ ehthumbs.db
 Thumbs.db
 
 # Output
-inference_results.json
 outputs/
 tests/test_output.txt
