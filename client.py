@@ -11,7 +11,10 @@ from typing import Dict
 from openenv.core import EnvClient
 from openenv.core.client_types import StepResult
 
-from .models import MedicalRecordAction, MedicalRecordObservation, MedicalRecordState
+try:
+    from .models import MedicalRecordAction, MedicalRecordObservation, MedicalRecordState
+except (ImportError, ModuleNotFoundError):
+    from models import MedicalRecordAction, MedicalRecordObservation, MedicalRecordState
 
 
 class MedicalRecordEnv(
