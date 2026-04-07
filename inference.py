@@ -40,7 +40,7 @@ except ImportError:
 # ─── Configuration ───
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.getenv("HF_TOKEN")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY")
 
 if not HF_TOKEN:
     print("WARNING: HF_TOKEN not set. LLM calls may fail.", file=sys.stderr, flush=True)
