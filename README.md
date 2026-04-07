@@ -1,12 +1,3 @@
----
-title: Medical Record Abstraction Env
-emoji: ⚕️
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 8000
----
-
 # Medical Record Abstraction Environment
 
 An OpenEnv-compliant reinforcement learning environment for extracting structured clinical data from unstructured patient notes.
