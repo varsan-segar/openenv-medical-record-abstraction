@@ -6,9 +6,9 @@ Uses the OpenAI chat completions API to run an agent against all 3 tasks.
 Supports any OpenAI-compatible API via environment variables.
 
 Environment Variables:
-    API_BASE_URL  — API endpoint (default: https://api.openai.com/v1)
-    MODEL_NAME    — Model to use (default: gpt-4o-mini)
-    HF_TOKEN      — Authentication token (used as API key)
+    API_BASE_URL      — API endpoint (default: https://api.openai.com/v1)
+    MODEL_NAME        — Model to use (default: gpt-4o-mini)
+    HF_TOKEN          — Authentication token (used as API key)
 
 Usage:
     python inference.py
@@ -33,19 +33,34 @@ except ImportError:
     pass
 
 # ─── Configuration ───
-API_BASE_URL = os.environ.get("API_BASE_URL")
-MODEL_NAME = os.environ.get("MODEL_NAME")
-# Use HF_TOKEN as primary, OPENAI_API_KEY as fallback just in case
-HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("OPENAI_API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-if not all([API_BASE_URL, MODEL_NAME, HF_TOKEN]):
-    print("ERROR: Missing required environment variables.", file=sys.stderr)
-    print("Please ensure API_BASE_URL, MODEL_NAME, and HF_TOKEN are set.", file=sys.stderr)
-    print("Example: API_BASE_URL='https://api.openai.com/v1' MODEL_NAME='gpt-4o-mini' HF_TOKEN='your_token'", file=sys.stderr)
-    sys.exit(1)
+if not HF_TOKEN:
+    print("WARNING: HF_TOKEN not set. LLM calls may fail.", file=sys.stderr)
 
 client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 env = MedicalRecordEnvironment()
+BENCHMARK = "medical_record_abstraction_env"
+
+
+# ─── Structured Logging (START / STEP / END) ───
+def log_start(task: str, env_name: str, model: str) -> None:
+    print(f"[START] task={task} env={env_name} model={model}")
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: str | None = None) -> None:
+    error_val = error if error else "null"
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} "
+        f"done={str(done).lower()} error={error_val}"
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}")
 
 # ─── System prompt ───
 SYSTEM_PROMPT = """\
@@ -69,6 +84,7 @@ For other commands, leave 'data' empty or omit it.
 
 def run_episode(task_id: str, note_id: int) -> dict:
     """Run a single episode and return results."""
+    log_start(task_id, BENCHMARK, MODEL_NAME)
     obs = env.reset(task_id=task_id, note_id=note_id)
 
     messages = [
@@ -85,6 +101,7 @@ def run_episode(task_id: str, note_id: int) -> dict:
     total_reward = 0.0
     final_score = 0.0
     steps = 0
+    rewards = []
 
     while not obs.done and steps < obs.max_steps + 2:
         # Call the LLM
@@ -116,7 +133,11 @@ def run_episode(task_id: str, note_id: int) -> dict:
         # Step the environment
         obs = env.step(action)
         total_reward += obs.reward
+        rewards.append(obs.reward)
         steps += 1
+
+        # Structured logging
+        log_step(steps, action.command, obs.reward, obs.done)
 
         # Build user message with observation
         obs_text = f"Step {obs.step_number}/{obs.max_steps} | Reward: {obs.reward:.4f}\n"
@@ -137,6 +158,8 @@ def run_episode(task_id: str, note_id: int) -> dict:
             final_score = env.state.current_score
 
         messages.append({"role": "user", "content": obs_text})
+
+    log_end(obs.done, steps, final_score, rewards)
 
     return {
         "task_id": task_id,

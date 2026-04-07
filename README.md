@@ -144,7 +144,7 @@ uvicorn server.app:app --host 0.0.0.0 --port 8000
 
 **Run via Docker (Pristine Container):**
 ```bash
-docker build -f server/Dockerfile -t medical_record_abstraction_env .
+docker build -t medical_record_abstraction_env .
 docker run -p 8000:8000 medical_record_abstraction_env
 ```
 
@@ -163,6 +163,7 @@ medical_record_abstraction_env/
 ├── client.py                       # EnvClient subclass
 ├── __init__.py                     # Package exports
 ├── README.md                       # Full documentation
+├── Dockerfile                      # Container deployment config
 ├── data/
 │   ├── synthetic_notes.py          # 24 clinical notes with ground truth
 │   ├── medical_ontology.py         # 47 conditions, ICD-10, synonyms
@@ -173,7 +174,6 @@ medical_record_abstraction_env/
 │   ├── graders.py                  # Deterministic grading system (F1, ROUGE-L)
 │   ├── reward.py                   # Continuous reward shaping
 │   ├── tasks.py                    # Task configs + clinical guidelines
-│   ├── Dockerfile                  # Container deployment config
 │   └── requirements.txt            # Local snapshot dependencies
 ├── tests/
 │   ├── test_env.py                 # Environment tests (24 items)
