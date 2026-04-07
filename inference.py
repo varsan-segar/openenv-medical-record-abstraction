@@ -10,6 +10,11 @@ Environment Variables:
     MODEL_NAME        — Model to use (default: gpt-4o-mini)
     HF_TOKEN          — Authentication token (used as API key)
 
+STDOUT FORMAT:
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
+
 Usage:
     python inference.py
     API_BASE_URL=http://localhost:8000/v1 MODEL_NAME=my-model python inference.py
@@ -17,8 +22,8 @@ Usage:
 
 import json
 import os
+import re
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -38,13 +43,13 @@ MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 if not HF_TOKEN:
-    print("WARNING: HF_TOKEN not set. LLM calls may fail.", file=sys.stderr)
+    print("WARNING: HF_TOKEN not set. LLM calls may fail.", file=sys.stderr, flush=True)
 
 client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 BENCHMARK = "medical_record_abstraction_env"
 
 
-# ─── Structured Logging (START / STEP / END) ───
+# ─── Structured Logging (START / STEP / END) — stdout only ───
 def log_start(task: str, env_name: str, model: str) -> None:
     print(f"[START] task={task} env={env_name} model={model}", flush=True)
 
@@ -60,7 +65,17 @@ def log_step(step: int, action: str, reward: float, done: bool, error: str | Non
 
 def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} "
+        f"score={score:.3f} rewards={rewards_str}",
+        flush=True,
+    )
+
+
+# ─── Debug helper (stderr only, never stdout) ───
+def debug(msg: str) -> None:
+    print(f"[DEBUG] {msg}", file=sys.stderr, flush=True)
+
 
 # ─── System prompt ───
 SYSTEM_PROMPT = """\
@@ -82,100 +97,8 @@ For other commands, leave 'data' empty or omit it.
 """
 
 
-def run_episode(task_id: str, note_id: int) -> dict:
-    """Run a single episode and return results."""
-    env = MedicalRecordEnvironment()
-    log_start(task_id, BENCHMARK, MODEL_NAME)
-    obs = env.reset(task_id=task_id, note_id=note_id)
-
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": (
-            f"Task: {task_id} | Note: {note_id}\n"
-            f"Available commands: {obs.available_commands}\n"
-            f"Max steps: {obs.max_steps}\n"
-            f"{obs.message}\n\n"
-            "Start by getting the task description."
-        )},
-    ]
-
-    total_reward = 0.0
-    final_score = 0.0
-    steps = 0
-    rewards = []
-
-    while not obs.done and steps < obs.max_steps + 2:
-        # Call the LLM
-        try:
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=0.0,
-                max_tokens=2000,
-            )
-            assistant_msg = response.choices[0].message.content.strip()
-        except Exception as e:
-            print(f"  API error: {e}", flush=True)
-            log_step(steps + 1, "error", 0.0, False, str(e))
-            break
-
-        messages.append({"role": "assistant", "content": assistant_msg})
-
-        # Parse action from LLM response
-        action = _parse_action(assistant_msg)
-        if action is None:
-            # Try to extract JSON from the response
-            messages.append({"role": "user", "content": (
-                "I couldn't parse your action. Please respond with exactly:\n"
-                '{"command": "<command_name>", "data": "<for_submit_only>"}'
-            )})
-            steps += 1
-            continue
-
-        # Step the environment
-        obs = env.step(action)
-        total_reward += obs.reward
-        rewards.append(obs.reward)
-        steps += 1
-
-        # Structured logging
-        log_step(steps, action.command, obs.reward, obs.done)
-
-        # Build user message with observation
-        obs_text = f"Step {obs.step_number}/{obs.max_steps} | Reward: {obs.reward:.4f}\n"
-        if obs.task_description:
-            obs_text += f"\nTask Description:\n{obs.task_description}\n"
-        if obs.clinical_note:
-            obs_text += f"\nClinical Note:\n{obs.clinical_note}\n"
-        if obs.drug_database:
-            obs_text += f"\nDrug Database:\n{obs.drug_database[:2000]}\n"
-        if obs.clinical_guidelines:
-            obs_text += f"\nClinical Guidelines:\n{obs.clinical_guidelines}\n"
-        if obs.message:
-            obs_text += f"\nMessage: {obs.message}\n"
-        if obs.done:
-            obs_text += "\n[EPISODE COMPLETE]"
-            final_score = obs.score_breakdown.get("total", obs.reward)
-            # Try to get the actual grader score from state
-            final_score = env.state.current_score
-
-        messages.append({"role": "user", "content": obs_text})
-
-    log_end(obs.done, steps, final_score, rewards)
-
-    return {
-        "task_id": task_id,
-        "note_id": note_id,
-        "steps": steps,
-        "total_reward": round(total_reward, 4),
-        "final_score": round(final_score, 4),
-        "score_breakdown": dict(obs.score_breakdown) if obs.done else {},
-    }
-
-
 def _parse_action(text: str) -> MedicalRecordAction | None:
     """Parse an action from LLM text output."""
-    # Try to find JSON in the response
     text = text.strip()
 
     # Try direct parse
@@ -190,7 +113,6 @@ def _parse_action(text: str) -> MedicalRecordAction | None:
         pass
 
     # Try to find JSON block in markdown
-    import re
     json_blocks = re.findall(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     for block in json_blocks:
         try:
@@ -218,82 +140,135 @@ def _parse_action(text: str) -> MedicalRecordAction | None:
     return None
 
 
+def run_episode(task_id: str, note_id: int) -> dict:
+    """Run a single episode and return results."""
+    env = MedicalRecordEnvironment()
+    rewards: list[float] = []
+    steps = 0
+    final_score = 0.0
+    success = False
+
+    log_start(task_id, BENCHMARK, MODEL_NAME)
+
+    try:
+        obs = env.reset(task_id=task_id, note_id=note_id)
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": (
+                f"Task: {task_id} | Note: {note_id}\n"
+                f"Available commands: {obs.available_commands}\n"
+                f"Max steps: {obs.max_steps}\n"
+                f"{obs.message}\n\n"
+                "Start by getting the task description."
+            )},
+        ]
+
+        while not obs.done and steps < obs.max_steps + 2:
+            # Call the LLM
+            try:
+                response = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    temperature=0.0,
+                    max_tokens=2000,
+                )
+                assistant_msg = response.choices[0].message.content.strip()
+            except Exception as e:
+                debug(f"API error: {e}")
+                log_step(steps + 1, "error", 0.0, False, str(e))
+                break
+
+            messages.append({"role": "assistant", "content": assistant_msg})
+
+            # Parse action from LLM response
+            action = _parse_action(assistant_msg)
+            if action is None:
+                messages.append({"role": "user", "content": (
+                    "I couldn't parse your action. Please respond with exactly:\n"
+                    '{"command": "<command_name>", "data": "<for_submit_only>"}'
+                )})
+                steps += 1
+                continue
+
+            # Step the environment
+            obs = env.step(action)
+            reward = obs.reward
+            rewards.append(reward)
+            steps += 1
+
+            # Structured logging — immediately after env.step()
+            log_step(steps, action.command, reward, obs.done)
+
+            # Build user message with observation
+            obs_text = f"Step {obs.step_number}/{obs.max_steps} | Reward: {obs.reward:.4f}\n"
+            if obs.task_description:
+                obs_text += f"\nTask Description:\n{obs.task_description}\n"
+            if obs.clinical_note:
+                obs_text += f"\nClinical Note:\n{obs.clinical_note}\n"
+            if obs.drug_database:
+                obs_text += f"\nDrug Database:\n{obs.drug_database[:2000]}\n"
+            if obs.clinical_guidelines:
+                obs_text += f"\nClinical Guidelines:\n{obs.clinical_guidelines}\n"
+            if obs.message:
+                obs_text += f"\nMessage: {obs.message}\n"
+            if obs.done:
+                obs_text += "\n[EPISODE COMPLETE]"
+                final_score = obs.score_breakdown.get("total", obs.reward)
+                final_score = env.state.current_score
+                success = final_score > 0.0
+
+            messages.append({"role": "user", "content": obs_text})
+
+    finally:
+        # [END] is ALWAYS emitted, even on exception
+        log_end(success=success, steps=steps, score=final_score, rewards=rewards)
+
+    return {
+        "task_id": task_id,
+        "note_id": note_id,
+        "steps": steps,
+        "total_reward": round(sum(rewards), 4),
+        "final_score": round(final_score, 4),
+        "score_breakdown": dict(obs.score_breakdown) if obs.done else {},
+    }
+
+
 def main():
     """Run baseline inference across all tasks."""
-    print("=" * 70)
-    print("Medical Record Abstraction — Baseline Inference")
-    print(f"API: {API_BASE_URL} | Model: {MODEL_NAME}")
-    print("=" * 70)
+    debug(f"API: {API_BASE_URL} | Model: {MODEL_NAME}")
 
     all_results = []
-    task_scores = {"task_1": [], "task_2": [], "task_3": []}
-
-    # Run 2 notes per task for baseline (8 total would take too long)
     notes_per_task = 2
 
     for task_id in ["task_1", "task_2", "task_3"]:
-        print(f"\n{'─' * 50}")
-        print(f"Running {task_id}...")
-        print(f"{'─' * 50}")
+        debug(f"Running {task_id}...")
 
         for note_id in range(notes_per_task):
-            print(f"\n  Note {note_id}:", end=" ")
-            start = time.time()
-
             try:
                 result = run_episode(task_id, note_id)
-                elapsed = time.time() - start
-                result["time_seconds"] = round(elapsed, 1)
-
-                print(f"score={result['final_score']:.4f}, "
-                      f"steps={result['steps']}, "
-                      f"time={elapsed:.1f}s")
-
                 all_results.append(result)
-                task_scores[task_id].append(result["final_score"])
+                debug(f"  {task_id}/note_{note_id}: score={result['final_score']:.4f}")
             except Exception as e:
-                print(f"ERROR: {e}")
+                debug(f"  {task_id}/note_{note_id}: ERROR: {e}")
                 all_results.append({
                     "task_id": task_id, "note_id": note_id,
                     "error": str(e), "final_score": 0.0,
                 })
-                task_scores[task_id].append(0.0)
 
-    # Summary
-    print("\n" + "=" * 70)
-    print("RESULTS SUMMARY")
-    print("=" * 70)
-
-    for task_id, scores in task_scores.items():
-        avg = sum(scores) / len(scores) if scores else 0.0
-        print(f"  {task_id}: avg={avg:.4f} | scores={scores}")
-
-    overall = sum(s for scores in task_scores.values() for s in scores)
-    total_n = sum(len(s) for s in task_scores.values())
-    print(f"\n  Overall average: {overall / total_n:.4f}" if total_n else "")
-
-    # Save results into the standard openenv outputs directory
+    # Save results to file (no stdout output)
     outputs_dir = os.path.join(os.path.dirname(__file__), "outputs")
     os.makedirs(outputs_dir, exist_ok=True)
     results_path = os.path.join(outputs_dir, "inference_results.json")
     with open(results_path, "w") as f:
-        json.dump({
-            "config": {
-                "api_base_url": API_BASE_URL,
-                "model_name": MODEL_NAME,
-                "notes_per_task": notes_per_task,
-            },
-            "task_scores": {k: {"mean": sum(v)/len(v) if v else 0, "scores": v}
-                           for k, v in task_scores.items()},
-            "results": all_results,
-        }, f, indent=2)
-    print(f"\nResults saved to {results_path}")
+        json.dump({"results": all_results}, f, indent=2)
+    debug(f"Results saved to {results_path}")
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(f"[END] success=false steps=0 score=0.00 rewards=0.00", flush=True)
-        print(f"FATAL: {exc}", file=sys.stderr, flush=True)
+        print(f"[END] success=false steps=0 score=0.000 rewards=0.00", flush=True)
+        debug(f"FATAL: {exc}")
         sys.exit(1)
