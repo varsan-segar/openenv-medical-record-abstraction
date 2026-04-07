@@ -41,26 +41,26 @@ if not HF_TOKEN:
     print("WARNING: HF_TOKEN not set. LLM calls may fail.", file=sys.stderr)
 
 client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-env = MedicalRecordEnvironment()
 BENCHMARK = "medical_record_abstraction_env"
 
 
 # ─── Structured Logging (START / STEP / END) ───
 def log_start(task: str, env_name: str, model: str) -> None:
-    print(f"[START] task={task} env={env_name} model={model}")
+    print(f"[START] task={task} env={env_name} model={model}", flush=True)
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: str | None = None) -> None:
     error_val = error if error else "null"
     print(
         f"[STEP] step={step} action={action} reward={reward:.2f} "
-        f"done={str(done).lower()} error={error_val}"
+        f"done={str(done).lower()} error={error_val}",
+        flush=True,
     )
 
 
 def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}")
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 # ─── System prompt ───
 SYSTEM_PROMPT = """\
@@ -84,6 +84,7 @@ For other commands, leave 'data' empty or omit it.
 
 def run_episode(task_id: str, note_id: int) -> dict:
     """Run a single episode and return results."""
+    env = MedicalRecordEnvironment()
     log_start(task_id, BENCHMARK, MODEL_NAME)
     obs = env.reset(task_id=task_id, note_id=note_id)
 
@@ -114,7 +115,8 @@ def run_episode(task_id: str, note_id: int) -> dict:
             )
             assistant_msg = response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"  API error: {e}")
+            print(f"  API error: {e}", flush=True)
+            log_step(steps + 1, "error", 0.0, False, str(e))
             break
 
         messages.append({"role": "assistant", "content": assistant_msg})
@@ -289,4 +291,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print(f"[END] success=false steps=0 score=0.00 rewards=0.00", flush=True)
+        print(f"FATAL: {exc}", file=sys.stderr, flush=True)
+        sys.exit(1)
