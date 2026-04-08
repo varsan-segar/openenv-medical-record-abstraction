@@ -216,7 +216,9 @@ def run_episode(task_id: str, note_id: int) -> dict:
                 obs_text += "\n[EPISODE COMPLETE]"
                 final_score = obs.score_breakdown.get("total", obs.reward)
                 final_score = env.state.current_score
-                success = final_score > 0.0
+                # Clamp to strictly (0, 1) — validator rejects 0.0 and 1.0
+                final_score = max(0.001, min(0.999, final_score))
+                success = final_score > 0.001
 
             messages.append({"role": "user", "content": obs_text})
 
