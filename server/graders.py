@@ -2,7 +2,7 @@
 Deterministic Grading System — Medical Record Abstraction Environment.
 
 All graders:
-  - Produce scores in [0.0, 1.0]
+  - Produce scores in (0.0, 1.0) exclusive
   - Are fully deterministic (same input → same output)
   - Use only Python stdlib (difflib for fuzzy matching)
   - Support partial credit via weighted component scoring
@@ -525,14 +525,17 @@ def grade_submission(
         ground_truth: Ground truth dict from the note bank
 
     Returns:
-        (score, breakdown) where score is in [0.0, 1.0]
+        (score, breakdown) where score is in (0.0, 1.0) exclusive
     """
     grader = GRADERS.get(task_id)
     if not grader:
-        return 0.0, {"error": 1.0}
+        return 0.01, {"error": 1.0}
 
     parsed = _safe_parse_json(raw_submission)
     if parsed is None:
-        return 0.0, {"parse_error": 1.0}
+        return 0.01, {"parse_error": 1.0}
 
-    return grader(parsed, ground_truth)
+    score, breakdown = grader(parsed, ground_truth)
+    # Clamp to strictly (0, 1) — validator rejects exactly 0.0 and 1.0
+    score = max(0.01, min(0.99, score))
+    return score, breakdown

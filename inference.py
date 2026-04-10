@@ -145,7 +145,7 @@ def run_episode(task_id: str, note_id: int) -> dict:
     env = MedicalRecordEnvironment()
     rewards: list[float] = []
     steps = 0
-    final_score = 0.0
+    final_score = 0.01
     success = False
 
     log_start(task_id, BENCHMARK, MODEL_NAME)
@@ -269,6 +269,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(f"[END] success=false steps=0 score=0.000 rewards=0.00", flush=True)
+        print(f"[END] success=false steps=0 score=0.010 rewards=0.00", flush=True)
         debug(f"FATAL: {exc}")
         sys.exit(1)
