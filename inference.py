@@ -145,7 +145,7 @@ def run_episode(task_id: str, note_id: int) -> dict:
     env = MedicalRecordEnvironment()
     rewards: list[float] = []
     steps = 0
-    final_score = 0.001
+    final_score = 0.0
     success = False
 
     log_start(task_id, BENCHMARK, MODEL_NAME)
@@ -216,9 +216,7 @@ def run_episode(task_id: str, note_id: int) -> dict:
                 obs_text += "\n[EPISODE COMPLETE]"
                 final_score = obs.score_breakdown.get("total", obs.reward)
                 final_score = env.state.current_score
-                # Clamp to strictly (0, 1) — validator rejects 0.0 and 1.0
-                final_score = max(0.001, min(0.999, final_score))
-                success = final_score > 0.001
+                success = final_score > 0.0
 
             messages.append({"role": "user", "content": obs_text})
 
@@ -271,6 +269,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(f"[END] success=false steps=0 score=0.001 rewards=0.00", flush=True)
+        print(f"[END] success=false steps=0 score=0.000 rewards=0.00", flush=True)
         debug(f"FATAL: {exc}")
         sys.exit(1)
